@@ -70,6 +70,9 @@ function handleAdminLogout() {
     showToast("관리자 로그아웃되었습니다.", "🔓");
 }
 
+document.getElementById("admin-toggle-btn").addEventListener("click", handleAdminLogin);
+document.getElementById("admin-logout-btn").addEventListener("click", handleAdminLogout);
+
 async function deleteUserAsAdmin(targetNickname) {
     if (!isAdminLoggedIn()) {
         showToast("관리자만 이름을 지울 수 있습니다.", "⚠️");
