@@ -1513,7 +1513,7 @@
         async function handleAdminLogin() {
             const inputPass = window.prompt("관리자 비밀번호를 입력하세요:");
             if (!inputPass) return;
-                
+
             try {
                 const isValid = await sbFetch("/rpc/verify_admin_password", {
                     method: "POST",
@@ -1592,7 +1592,6 @@
             const currentName = getMyNickname();
         
             try {
-                // 1. 이미 등록된 이름인지 확인 (대소문자/공백 정리 기준)
                 const duplicates = await sbFetch(
                     `/advent_users?select=id,nickname&nickname=eq.${encodeURIComponent(cleaned)}`
                 );
@@ -1607,7 +1606,6 @@
                     return;
                 }
             
-                // 2. 기존 내 이름이 있다면 새 이름으로 변경(PATCH), 없다면 신규 등록(POST)
                 if (currentName) {
                     const updatedRows = await sbFetch(
                         `/advent_users?nickname=eq.${encodeURIComponent(currentName)}`,
@@ -1618,24 +1616,19 @@
                         }
                     );
                     
-                    // 기존 행이 DB에 없었던 경우 대비
                     if (!Array.isArray(updatedRows) || updatedRows.length === 0) {
-                        await sbFetch("/advent_users", {
-                            method: "POST",
-                            headers: { "Prefer": "return=representation" },
-                            body: JSON.stringify({ nickname: cleaned })
-                        });
-                    } else {
-                        // 기존 이름으로 보낸/받은 명언 기록의 이름도 함께 갱신
-                        await sbFetch(`/advent_quotes?sender=eq.${encodeURIComponent(currentName)}`, {
-                            method: "PATCH",
-                            body: JSON.stringify({ sender: cleaned })
-                        });
-                        await sbFetch(`/advent_quotes?recipient=eq.${encodeURIComponent(currentName)}`, {
-                            method: "PATCH",
-                            body: JSON.stringify({ recipient: cleaned })
-                        });
+                        showToast(`기존 이름 "${currentName}"을 수정하지 못했습니다. Supabase UPDATE 권한/RLS 정책을 확인해 주세요.`, "⚠️");
+                        return;
                     }
+                
+                    await sbFetch(`/advent_quotes?sender=eq.${encodeURIComponent(currentName)}`, {
+                        method: "PATCH",
+                        body: JSON.stringify({ sender: cleaned })
+                    });
+                    await sbFetch(`/advent_quotes?recipient=eq.${encodeURIComponent(currentName)}`, {
+                        method: "PATCH",
+                        body: JSON.stringify({ recipient: cleaned })
+                    });
                 
                     setMyNickname(cleaned);
                     document.getElementById("nickname-input").value = "";
