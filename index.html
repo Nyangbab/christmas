@@ -330,8 +330,8 @@
 
                 <button id="mode-toggle" type="button"
                     class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 active:scale-95 border border-emerald-400/40 text-emerald-200 text-sm font-medium transition shadow-md backdrop-blur-md">
-                    <span id="mode-icon">🔓</span>
-                    <span id="mode-text">테스트 모드: 모두 열기 가능</span>
+                    <span id="mode-icon">📅</span>
+                    <span id="mode-text">실제 날짜 잠금 모드</span>
                 </button>
 
                 <div class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 border border-white/15 text-slate-200 text-sm backdrop-blur-md">
@@ -985,7 +985,7 @@
          */
         const STORAGE_KEY = "christmas_advent_opened_v1";
         let openedDays = new Set();
-        let testMode = true;
+        let testMode = false;
         let currentModalItem = null;
         let openCombo = 0;
         let lastOpenTimestamp = 0;
