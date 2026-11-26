@@ -363,7 +363,7 @@
                         </button>
                     </div>
                 </div>
-            
+
                 <div class="flex flex-col sm:flex-row gap-2">
                     <input id="nickname-input" type="text" maxlength="20" placeholder="내 이름 입력 (실명은 입력하지 말것)"
                         class="flex-1 px-3.5 py-2 rounded-xl bg-slate-950/60 border border-white/20 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-amber-400">
@@ -507,7 +507,7 @@
 
     <script>
         /**
-         * 0. Supabase 설정 (본인 프로젝트 값으로 교체)
+         * 0. Supabase 설정 (토큰 없는 원본 방식)
          */
         const SUPABASE_URL = "https://nzeeqpvkkimnuarvryky.supabase.co";
         const SUPABASE_ANON_KEY = "sb_publishable_O6q4g0KCSbzlQvF1wXfaTA_LkuH9Iob";
@@ -671,7 +671,7 @@
         async function sendQuoteToRecipient() {
             const myName = getMyNickname();
             if (!myName) {
-                showToast("먼저 내 이름을 등록해 주세요! (예: 냥밥)", "⚠️");
+                showToast("먼저 내 이름을 등록해 주세요! (예: Nyang_bab)", "⚠️");
                 return;
             }
             const recipient = document.getElementById("recipient-select").value;
