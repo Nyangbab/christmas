@@ -363,9 +363,9 @@
                         </button>
                     </div>
                 </div>
-
+            
                 <div class="flex flex-col sm:flex-row gap-2">
-                    <input id="nickname-input" type="text" maxlength="16" placeholder="닉네임 입력 (실명은 적지 말것, 2~16자)"
+                    <input id="nickname-input" type="text" maxlength="20" placeholder="내 이름 입력 (실명은 입력하지 말것)"
                         class="flex-1 px-3.5 py-2 rounded-xl bg-slate-950/60 border border-white/20 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-amber-400">
                     <button id="register-name-btn" type="button"
                         class="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 active:scale-95 text-slate-950 text-sm font-bold transition shrink-0">
@@ -442,7 +442,7 @@
                     <option value="">받는 사람 목록 불러오는 중...</option>
                 </select>
 
-                <input id="send-message-input" type="text" maxlength="100" placeholder="함께 전할 짧은 메시지 (선택, 최대 100자)"
+                <input id="send-message-input" type="text" maxlength="120" placeholder="함께 전할 짧은 메시지 (선택)"
                     class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/20 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-amber-400">
 
                 <button id="send-quote-btn" type="button"
@@ -507,97 +507,36 @@
 
     <script>
         /**
-         * 0. Supabase 설정 및 보안 유틸리티 (로그인 없는 토큰 기반)
+         * 0. Supabase 설정 (본인 프로젝트 값으로 교체)
          */
         const SUPABASE_URL = "https://nzeeqpvkkimnuarvryky.supabase.co";
         const SUPABASE_ANON_KEY = "sb_publishable_O6q4g0KCSbzlQvF1wXfaTA_LkuH9Iob";
         const MY_NICKNAME_STORAGE_KEY = "christmas_advent_my_nickname_v1";
-        const MY_TOKEN_STORAGE_KEY = "christmas_advent_sender_token_v1";
-        const NICKNAME_PATTERN = /^[가-힣a-zA-Z0-9_]{2,16}$/;
-        const ACTION_COOLDOWN_MS = 2000;
 
         let registeredUsers = [];
-        let isSubmittingAction = false;
-        let lastSendTimestamp = 0;
-
-        function escapeHtml(value) {
-            return String(value ?? "")
-                .replace(/&/g, "&amp;")
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;")
-                .replace(/"/g, "&quot;")
-                .replace(/'/g, "&#39;");
-        }
-
-        function sanitizeNicknameInput(raw) {
-            return String(raw ?? "").trim();
-        }
-
-        function validateNickname(name) {
-            if (!name) return "이름을 입력해 주세요.";
-            if (!NICKNAME_PATTERN.test(name)) {
-                return "이름은 2~16자의 한글, 영문, 숫자, 밑줄(_)만 사용할 수 있습니다.";
-            }
-            return null;
-        }
-
-        function formatSafeDate(isoString) {
-            const parsed = new Date(isoString);
-            if (Number.isNaN(parsed.getTime())) return "";
-            return parsed.toLocaleString("ko-KR");
-        }
-
-        function getOrCreateSenderToken() {
-            let token = localStorage.getItem(MY_TOKEN_STORAGE_KEY) || "";
-            if (token.length < 16) {
-                if (window.crypto && typeof window.crypto.randomUUID === "function") {
-                    token = window.crypto.randomUUID() + "-" + window.crypto.randomUUID();
-                } else {
-                    const arr = new Uint8Array(24);
-                    window.crypto.getRandomValues(arr);
-                    token = Array.from(arr, (b) => b.toString(16).padStart(2, "0")).join("");
-                }
-                localStorage.setItem(MY_TOKEN_STORAGE_KEY, token);
-            }
-            return token;
-        }
 
         function isSupabaseConfigured() {
-            if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return false;
-            if (
-                SUPABASE_URL.includes("YOUR_PROJECT_REF") ||
-                SUPABASE_ANON_KEY.includes("YOUR_SUPABASE_ANON_KEY")
-            ) {
-                return false;
-            }
-            try {
-                const urlObj = new URL(SUPABASE_URL);
-                return urlObj.protocol === "https:";
-            } catch (_) {
-                return false;
-            }
+            return (
+                SUPABASE_URL &&
+                SUPABASE_ANON_KEY &&
+                !SUPABASE_URL.includes("YOUR_PROJECT_REF") &&
+                !SUPABASE_ANON_KEY.includes("YOUR_SUPABASE_ANON_KEY")
+            );
         }
 
         function getMyNickname() {
-            const raw = sanitizeNicknameInput(localStorage.getItem(MY_NICKNAME_STORAGE_KEY) || "");
-            return NICKNAME_PATTERN.test(raw) ? raw : "";
+            return localStorage.getItem(MY_NICKNAME_STORAGE_KEY) || "";
         }
 
         function setMyNickname(name) {
-            const cleaned = sanitizeNicknameInput(name);
-            if (cleaned && NICKNAME_PATTERN.test(cleaned)) {
-                localStorage.setItem(MY_NICKNAME_STORAGE_KEY, cleaned);
-                document.getElementById("current-user-label").textContent = cleaned;
-            } else {
-                localStorage.removeItem(MY_NICKNAME_STORAGE_KEY);
-                document.getElementById("current-user-label").textContent = "미등록";
-            }
+            localStorage.setItem(MY_NICKNAME_STORAGE_KEY, name);
+            document.getElementById("current-user-label").textContent = name || "미등록";
             renderRecipientSelect();
         }
 
         async function sbFetch(path, options = {}) {
             if (!isSupabaseConfigured()) {
-                throw new Error("Supabase URL 또는 Key가 올바르지 않습니다.");
+                throw new Error("SUPABASE_URL 또는 SUPABASE_ANON_KEY가 설정되지 않았습니다.");
             }
             const headers = {
                 "apikey": SUPABASE_ANON_KEY,
@@ -610,7 +549,8 @@
                 headers
             });
             if (!res.ok) {
-                throw new Error(`HTTP ${res.status}`);
+                const errText = await res.text();
+                throw new Error(errText || `HTTP ${res.status}`);
             }
             if (res.status === 204) return null;
             const text = await res.text();
@@ -625,9 +565,7 @@
             }
             try {
                 const rows = await sbFetch("/advent_users?select=id,nickname,created_at&order=nickname.asc");
-                registeredUsers = Array.isArray(rows)
-                    ? rows.filter((u) => u && NICKNAME_PATTERN.test(sanitizeNicknameInput(u.nickname)))
-                    : [];
+                registeredUsers = Array.isArray(rows) ? rows : [];
                 document.getElementById("registered-count-label").textContent = String(registeredUsers.length);
                 renderRecipientSelect();
                 await refreshInboxCount();
@@ -642,147 +580,122 @@
             const myName = getMyNickname();
 
             if (!isSupabaseConfigured()) {
-                select.innerHTML = "";
-                const opt = document.createElement("option");
-                opt.value = "";
-                opt.textContent = "Supabase URL/KEY를 먼저 입력하세요";
-                select.appendChild(opt);
+                select.innerHTML = `<option value="">Supabase URL/KEY를 먼저 입력하세요</option>`;
                 return;
             }
 
             if (registeredUsers.length === 0) {
-                select.innerHTML = "";
-                const opt = document.createElement("option");
-                opt.value = "";
-                opt.textContent = "등록된 이름이 없습니다";
-                select.appendChild(opt);
+                select.innerHTML = `<option value="">등록된 이름이 없습니다</option>`;
                 return;
             }
 
-            select.innerHTML = "";
-            const placeholder = document.createElement("option");
-            placeholder.value = "";
-            placeholder.textContent = "받는 사람 선택";
-            select.appendChild(placeholder);
-
+            select.innerHTML = `<option value="">받는 사람 선택</option>`;
             registeredUsers.forEach((u) => {
-                const nick = sanitizeNicknameInput(u.nickname);
                 const opt = document.createElement("option");
-                opt.value = nick;
-                opt.textContent = nick === myName ? `${nick} (나)` : nick;
+                opt.value = u.nickname;
+                opt.textContent = u.nickname === myName ? `${u.nickname} (나)` : u.nickname;
                 select.appendChild(opt);
             });
         }
 
         async function registerNickname(nickname) {
-            if (isSubmittingAction) return;
-            const cleaned = sanitizeNicknameInput(nickname);
-            const validationError = validateNickname(cleaned);
-            if (validationError) {
-                showToast(validationError, "⚠️");
+            const cleaned = nickname.trim();
+            if (!cleaned) {
+                showToast("이름을 입력해 주세요.", "⚠️");
                 return;
             }
 
             const currentName = getMyNickname();
-            if (currentName && currentName === cleaned) {
-                showToast("현재 사용 중인 이름과 같습니다.", "ℹ️");
-                return;
-            }
-
-            const token = getOrCreateSenderToken();
-            isSubmittingAction = true;
 
             try {
-                const result = await sbFetch("/rpc/register_or_rename_user", {
-                    method: "POST",
-                    body: JSON.stringify({
-                        p_old_nickname: currentName,
-                        p_new_nickname: cleaned,
-                        p_token: token
-                    })
-                });
+                const duplicates = await sbFetch(
+                    `/advent_users?select=id,nickname&nickname=eq.${encodeURIComponent(cleaned)}`
+                );
+                const isDuplicate = Array.isArray(duplicates) && duplicates.length > 0;
 
-                if (!result || !result.ok) {
-                    const code = result?.error || "";
-                    if (code === "DUPLICATE_NICKNAME") {
-                        showToast(`"${cleaned}" 이름은 이미 사용 중입니다. 다른 이름을 입력해 주세요.`, "⚠️");
-                    } else if (code === "UNAUTHORIZED") {
-                        showToast("기존 이름의 소유 토큰이 일치하지 않아 변경할 수 없습니다.", "⚠️");
+                if (isDuplicate) {
+                    if (currentName && currentName === cleaned) {
+                        showToast("현재 사용 중인 이름과 같습니다.", "ℹ️");
                     } else {
-                        showToast("이름 등록/변경에 실패했습니다.", "⚠️");
+                        showToast(`"${cleaned}" 이름은 이미 사용 중입니다. 다른 이름을 입력해 주세요.`, "⚠️");
                     }
                     return;
                 }
 
-                setMyNickname(cleaned);
-                document.getElementById("nickname-input").value = "";
-                await loadRegisteredUsers();
+                if (currentName) {
+                    const updatedRows = await sbFetch(
+                        `/advent_users?nickname=eq.${encodeURIComponent(currentName)}`,
+                        {
+                            method: "PATCH",
+                            headers: { "Prefer": "return=representation" },
+                            body: JSON.stringify({ nickname: cleaned })
+                        }
+                    );
 
-                if (result.mode === "renamed") {
+                    if (!Array.isArray(updatedRows) || updatedRows.length === 0) {
+                        showToast(`기존 이름 "${currentName}"을 수정하지 못했습니다. Supabase UPDATE 권한/RLS 정책을 확인해 주세요.`, "⚠️");
+                        return;
+                    }
+
+                    await sbFetch(`/advent_quotes?sender=eq.${encodeURIComponent(currentName)}`, {
+                        method: "PATCH",
+                        body: JSON.stringify({ sender: cleaned })
+                    });
+                    await sbFetch(`/advent_quotes?recipient=eq.${encodeURIComponent(currentName)}`, {
+                        method: "PATCH",
+                        body: JSON.stringify({ recipient: cleaned })
+                    });
+
+                    setMyNickname(cleaned);
+                    document.getElementById("nickname-input").value = "";
+                    await loadRegisteredUsers();
                     showToast(`이름이 "${currentName}"에서 "${cleaned}"(으)로 변경되었습니다.`, "✅");
                 } else {
+                    await sbFetch("/advent_users", {
+                        method: "POST",
+                        headers: { "Prefer": "return=representation" },
+                        body: JSON.stringify({ nickname: cleaned })
+                    });
+
+                    setMyNickname(cleaned);
+                    document.getElementById("nickname-input").value = "";
+                    await loadRegisteredUsers();
                     showToast(`"${cleaned}" 이름이 서버에 등록되었습니다.`, "✅");
                 }
             } catch (err) {
                 console.error("이름 등록/변경 실패:", err);
                 showToast("이름 처리 중 오류가 발생했습니다.", "⚠️");
-            } finally {
-                isSubmittingAction = false;
             }
         }
 
         async function sendQuoteToRecipient() {
             const myName = getMyNickname();
             if (!myName) {
-                showToast("먼저 내 이름을 등록해 주세요!", "⚠️");
+                showToast("먼저 내 이름을 등록해 주세요! (예: 냥밥)", "⚠️");
                 return;
             }
-            const recipient = sanitizeNicknameInput(document.getElementById("recipient-select").value);
-            if (!recipient || !NICKNAME_PATTERN.test(recipient)) {
+            const recipient = document.getElementById("recipient-select").value;
+            if (!recipient) {
                 showToast("목록에서 받는 사람을 선택해 주세요.", "⚠️");
                 return;
             }
             if (!currentModalItem) return;
 
-            const now = Date.now();
-            if (now - lastSendTimestamp < ACTION_COOLDOWN_MS) {
-                showToast("잠시 후 다시 시도해 주세요.", "⏳");
-                return;
-            }
-
-            const message = String(document.getElementById("send-message-input").value || "")
-                .trim()
-                .slice(0, 100);
-            const token = getOrCreateSenderToken();
-
-            lastSendTimestamp = now;
+            const message = document.getElementById("send-message-input").value.trim();
 
             try {
-                const result = await sbFetch("/rpc/send_advent_quote", {
+                await sbFetch("/advent_quotes", {
                     method: "POST",
+                    headers: { "Prefer": "return=representation" },
                     body: JSON.stringify({
-                        p_sender: myName,
-                        p_token: token,
-                        p_recipient: recipient,
-                        p_day: Number(currentModalItem.day),
-                        p_quote: String(currentModalItem.quote).slice(0, 300),
-                        p_author: String(currentModalItem.author).slice(0, 100),
-                        p_message: message
+                        sender: myName,
+                        recipient,
+                        day: currentModalItem.day,
+                        quote: currentModalItem.quote,
+                        author: currentModalItem.author,
+                        message
                     })
                 });
-
-                if (!result || !result.ok) {
-                    const code = result?.error || "";
-                    if (code === "UNAUTHORIZED_SENDER") {
-                        showToast("발신자 인증 토큰이 일치하지 않습니다. 이름을 다시 등록해 주세요.", "⚠️");
-                    } else if (code === "RATE_LIMITED") {
-                        showToast("너무 빠르게 연속 전송할 수 없습니다. 잠시 후 시도해 주세요.", "⏳");
-                    } else {
-                        showToast("명언 전송에 실패했습니다.", "⚠️");
-                    }
-                    return;
-                }
-
                 document.getElementById("send-message-input").value = "";
                 showToast(`${recipient}님에게 명언을 보냈습니다!`, "🎁");
             } catch (err) {
@@ -792,9 +705,9 @@
         }
 
         async function fetchReceivedQuotes(nickname) {
-            if (!nickname || !NICKNAME_PATTERN.test(nickname) || !isSupabaseConfigured()) return [];
+            if (!nickname || !isSupabaseConfigured()) return [];
             const rows = await sbFetch(
-                `/advent_quotes?select=id,sender,recipient,day,quote,author,message,created_at&recipient=eq.${encodeURIComponent(nickname)}&order=created_at.desc&limit=50`
+                `/advent_quotes?select=id,sender,recipient,day,quote,author,message,created_at&recipient=eq.${encodeURIComponent(nickname)}&order=created_at.desc`
             );
             return Array.isArray(rows) ? rows : [];
         }
@@ -835,30 +748,21 @@
                 document.getElementById("inbox-badge").textContent = String(quotes.length);
 
                 if (quotes.length === 0) {
-                    listEl.innerHTML = `<p class="text-slate-400 text-center py-6">"${escapeHtml(myName)}"님에게 도착한 명언이 아직 없습니다.</p>`;
+                    listEl.innerHTML = `<p class="text-slate-400 text-center py-6">"${myName}"님에게 도착한 명언이 아직 없습니다.</p>`;
                     return;
                 }
 
-                listEl.innerHTML = quotes.map((q) => {
-                    const safeSender = escapeHtml(q.sender);
-                    const safeDay = Number.isInteger(Number(q.day)) ? Number(q.day) : 1;
-                    const safeQuote = escapeHtml(q.quote);
-                    const safeAuthor = escapeHtml(q.author);
-                    const safeTime = escapeHtml(formatSafeDate(q.created_at));
-                    const safeMsg = q.message ? escapeHtml(String(q.message).slice(0, 100)) : "";
-
-                    return `
-                        <div class="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-1.5">
-                            <div class="flex items-center justify-between text-xs text-amber-300">
-                                <span>보낸 사람: <strong>${safeSender}</strong> · 12월 ${safeDay}일</span>
-                                <span class="text-slate-400">${safeTime}</span>
-                            </div>
-                            <p class="font-serif-kr text-sm text-amber-50 font-semibold leading-relaxed">"${safeQuote}"</p>
-                            <p class="text-xs text-amber-200/80">- ${safeAuthor} -</p>
-                            ${safeMsg ? `<p class="text-xs text-emerald-300 pt-1">💬 "${safeMsg}"</p>` : ""}
+                listEl.innerHTML = quotes.map((q) => `
+                    <div class="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-1.5">
+                        <div class="flex items-center justify-between text-xs text-amber-300">
+                            <span>보낸 사람: <strong>${q.sender}</strong> · 12월 ${q.day}일</span>
+                            <span class="text-slate-400">${new Date(q.created_at).toLocaleString("ko-KR")}</span>
                         </div>
-                    `;
-                }).join("");
+                        <p class="font-serif-kr text-sm text-amber-50 font-semibold leading-relaxed">"${q.quote}"</p>
+                        <p class="text-xs text-amber-200/80">- ${q.author} -</p>
+                        ${q.message ? `<p class="text-xs text-emerald-300 pt-1">💬 "${q.message}"</p>` : ""}
+                    </div>
+                `).join("");
             } catch (err) {
                 console.error("받은 명언 조회 실패:", err);
                 listEl.innerHTML = `<p class="text-rose-300 text-center py-6">받은 명언을 불러오지 못했습니다.</p>`;
@@ -1116,11 +1020,7 @@
                 if (saved) {
                     const parsed = JSON.parse(saved);
                     if (Array.isArray(parsed)) {
-                        openedDays = new Set(
-                            parsed
-                                .map((d) => Number(d))
-                                .filter((d) => Number.isInteger(d) && d >= 1 && d <= 25)
-                        );
+                        openedDays = new Set(parsed);
                     }
                 }
             } catch (e) {
@@ -1201,9 +1101,9 @@
                     <span class="relative z-10 text-[10px] sm:text-xs font-bold text-amber-800 bg-amber-300/70 px-2 py-0.5 rounded-full mb-1">
                         12월 ${item.day}일
                     </span>
-                    <span class="relative z-10 text-2xl sm:text-3xl my-0.5 drop-shadow-sm">${escapeHtml(item.icon)}</span>
+                    <span class="relative z-10 text-2xl sm:text-3xl my-0.5 drop-shadow-sm">${item.icon}</span>
                     <p class="relative z-10 font-serif-kr text-[11px] sm:text-xs font-bold text-amber-950 line-clamp-2 text-center leading-snug px-1">
-                        "${escapeHtml(item.quote)}"
+                        "${item.quote}"
                     </p>
                     <span class="relative z-10 text-[10px] text-amber-700 mt-1 font-semibold">다시 보기 ↗</span>
                 `;
@@ -1218,7 +1118,7 @@
                         ${locked ? "🔒" : isSpecial25 ? "⭐" : "✨"}
                     </div>
                     <div class="door-knob" aria-hidden="true"></div>
-                    <span class="text-2xl sm:text-3xl mb-1 drop-shadow">${escapeHtml(item.icon)}</span>
+                    <span class="text-2xl sm:text-3xl mb-1 drop-shadow">${item.icon}</span>
                     <span class="font-christmas text-3xl sm:text-4xl font-bold text-amber-100 drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)]">
                         ${item.day}
                     </span>
@@ -1352,8 +1252,8 @@
         let toastTimeout = null;
         function showToast(message, icon = "✨") {
             const toast = document.getElementById("toast");
-            document.getElementById("toast-msg").textContent = String(message ?? "");
-            document.getElementById("toast-icon").textContent = String(icon ?? "✨");
+            document.getElementById("toast-msg").textContent = message;
+            document.getElementById("toast-icon").textContent = icon;
             toast.classList.remove("translate-y-20", "opacity-0");
             if (toastTimeout) clearTimeout(toastTimeout);
             toastTimeout = setTimeout(() => {
@@ -1575,7 +1475,6 @@
 
         window.onload = function () {
             loadState();
-            getOrCreateSenderToken();
             setMyNickname(getMyNickname());
             updateDdayBadge();
             renderFairyLights();
